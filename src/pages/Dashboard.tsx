@@ -1,8 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, AlertTriangle, XCircle, TrendingUp } from "lucide-react";
+import { CheckCircle, AlertTriangle, XCircle, TrendingUp, X } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { useState } from "react";
 
 export default function Dashboard() {
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const metrics = [
     {
       title: "Compliance Status",
@@ -60,6 +63,32 @@ export default function Dashboard() {
     }
   };
 
+  const detailedIssues = {
+    "Compliance Status": [
+      { id: 1, issue: "GAAP revenue recognition compliance met", severity: "Low", date: "2025-10-18" },
+      { id: 2, issue: "IFRS lease classification compliant", severity: "Low", date: "2025-10-17" },
+      { id: 3, issue: "Minor formatting inconsistencies", severity: "Medium", date: "2025-10-16" }
+    ],
+    "Total Discrepancies": [
+      { id: 1, issue: "Revenue timing mismatch in Q3 statements", severity: "High", date: "2025-10-18" },
+      { id: 2, issue: "Inventory valuation method inconsistency", severity: "Medium", date: "2025-10-17" },
+      { id: 3, issue: "Lease liability calculation variance", severity: "Medium", date: "2025-10-16" },
+      { id: 4, issue: "Depreciation schedule discrepancy", severity: "Low", date: "2025-10-15" }
+    ],
+    "Critical Issues": [
+      { id: 1, issue: "SOX 404 internal control weakness", severity: "High", date: "2025-10-18" },
+      { id: 2, issue: "Material misstatement in financial position", severity: "High", date: "2025-10-17" },
+      { id: 3, issue: "Inadequate segregation of duties", severity: "High", date: "2025-10-16" },
+      { id: 4, issue: "Missing audit trail documentation", severity: "High", date: "2025-10-15" },
+      { id: 5, issue: "Unauthorized journal entry detected", severity: "High", date: "2025-10-14" }
+    ],
+    "Financial Health": [
+      { id: 1, issue: "Strong liquidity ratio maintained", severity: "Low", date: "2025-10-18" },
+      { id: 2, issue: "Debt-to-equity ratio within healthy range", severity: "Low", date: "2025-10-17" },
+      { id: 3, issue: "Operating cash flow positive", severity: "Low", date: "2025-10-16" }
+    ]
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -71,7 +100,11 @@ export default function Dashboard() {
         {metrics.map((metric) => {
           const Icon = metric.icon;
           return (
-            <Card key={metric.title} className="shadow-card">
+            <Card 
+              key={metric.title} 
+              className="shadow-card cursor-pointer hover:shadow-elevated transition-shadow"
+              onClick={() => setSelectedMetric(metric.title)}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
                 <Icon className={`h-4 w-4 text-${metric.status}`} />
@@ -118,6 +151,31 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      <Sheet open={!!selectedMetric} onOpenChange={() => setSelectedMetric(null)}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{selectedMetric}</SheetTitle>
+            <SheetDescription>
+              Detailed issues and discrepancies
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-6 space-y-4">
+            {selectedMetric && detailedIssues[selectedMetric as keyof typeof detailedIssues]?.map((issue) => (
+              <Card key={issue.id} className="shadow-sm">
+                <CardContent className="pt-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <Badge variant={getSeverityColor(issue.severity)}>{issue.severity}</Badge>
+                    <span className="text-xs text-muted-foreground">{issue.date}</span>
+                  </div>
+                  <p className="text-sm text-foreground">{issue.issue}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
