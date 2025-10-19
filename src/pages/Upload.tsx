@@ -1,22 +1,27 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload as UploadIcon, FileText, CheckCircle2, X } from "lucide-react";
+import { Upload as UploadIcon, FileText, CheckCircle2, X, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { uploadDocument, pollDocumentStatus } from "@/services/api";
+import { StatusResponse } from "@/types/api";
 
 interface UploadedFile {
   id: string;
   name: string;
   size: number;
-  status: "uploading" | "completed" | "error";
+  status: "uploading" | "processing" | "completed" | "error";
   progress: number;
+  documentKey?: string;
+  stage?: string;
+  error?: string;
 }
 
 export default function Upload() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const { toast } = useToast();
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
     
     const newFiles: UploadedFile[] = selectedFiles.map((file) => ({
@@ -29,30 +34,83 @@ export default function Upload() {
 
     setFiles([...files, ...newFiles]);
 
-    // Simulate upload progress
-    newFiles.forEach((file) => {
-      simulateUpload(file.id);
-    });
+    // Upload each file to AWS backend
+    for (const newFile of newFiles) {
+      const actualFile = selectedFiles.find(f => f.name === newFile.name);
+      if (actualFile) {
+        handleUpload(newFile.id, actualFile);
+      }
+    }
   };
 
-  const simulateUpload = (fileId: string) => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 10;
+  const handleUpload = async (fileId: string, file: File) => {
+    try {
+      // Upload to AWS API Gateway
+      const uploadResponse = await uploadDocument(file);
+      
       setFiles((prev) =>
         prev.map((f) =>
-          f.id === fileId ? { ...f, progress, status: progress >= 100 ? "completed" : "uploading" } : f
+          f.id === fileId 
+            ? { 
+                ...f, 
+                documentKey: uploadResponse.documentKey, 
+                status: "processing",
+                progress: 25,
+                stage: "uploaded"
+              } 
+            : f
         )
       );
 
-      if (progress >= 100) {
-        clearInterval(interval);
-        toast({
-          title: "Upload completed",
-          description: "Your file has been uploaded successfully.",
-        });
-      }
-    }, 300);
+      // Poll for status
+      await pollDocumentStatus(
+        uploadResponse.documentKey,
+        (status: StatusResponse) => {
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.documentKey === uploadResponse.documentKey
+                ? {
+                    ...f,
+                    status: status.status === "completed" ? "completed" : status.status === "failed" ? "error" : "processing",
+                    progress: status.progress,
+                    stage: status.stage,
+                    error: status.error || undefined,
+                  }
+                : f
+            )
+          );
+        }
+      );
+
+      // Store documentKey in localStorage for Dashboard access
+      localStorage.setItem("latestDocumentKey", uploadResponse.documentKey);
+      
+      toast({
+        title: "Processing completed",
+        description: `${file.name} has been analyzed successfully.`,
+      });
+
+    } catch (error) {
+      console.error("Upload error:", error);
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? { 
+                ...f, 
+                status: "error", 
+                progress: 0,
+                error: error instanceof Error ? error.message : "Upload failed" 
+              }
+            : f
+        )
+      );
+      
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to upload document",
+        variant: "destructive",
+      });
+    }
   };
 
   const removeFile = (fileId: string) => {
@@ -114,7 +172,7 @@ export default function Upload() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">{file.name}</p>
                     <p className="text-sm text-muted-foreground">{formatFileSize(file.size)}</p>
-                    {file.status === "uploading" && (
+                    {(file.status === "uploading" || file.status === "processing") && (
                       <div className="mt-2">
                         <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <div
@@ -122,12 +180,20 @@ export default function Upload() {
                             style={{ width: `${file.progress}%` }}
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">{file.progress}%</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {file.stage ? `${file.stage} - ${file.progress}%` : `${file.progress}%`}
+                        </p>
                       </div>
+                    )}
+                    {file.status === "error" && file.error && (
+                      <p className="text-xs text-destructive mt-1">{file.error}</p>
                     )}
                   </div>
                   {file.status === "completed" && (
                     <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  )}
+                  {file.status === "error" && (
+                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
                   )}
                   <Button
                     variant="ghost"

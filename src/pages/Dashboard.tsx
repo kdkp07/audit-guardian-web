@@ -1,11 +1,38 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, AlertTriangle, XCircle, TrendingUp, X } from "lucide-react";
+import { CheckCircle, AlertTriangle, XCircle, TrendingUp, Activity, DollarSign, TrendingDown } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getDocumentResults } from "@/services/api";
+import { ResultsResponse } from "@/types/api";
 
 export default function Dashboard() {
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [resultsData, setResultsData] = useState<ResultsResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch latest results (placeholder - would need documentKey from storage/context)
+  useEffect(() => {
+    const fetchLatestResults = async () => {
+      // TODO: Get documentKey from localStorage or context
+      const latestDocKey = localStorage.getItem("latestDocumentKey");
+      
+      if (latestDocKey) {
+        setLoading(true);
+        try {
+          const results = await getDocumentResults(latestDocKey);
+          setResultsData(results);
+        } catch (error) {
+          console.error("Failed to fetch results:", error);
+          // Fall back to mock data
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchLatestResults();
+  }, []);
   const metrics = [
     {
       title: "Compliance Status",
@@ -94,7 +121,124 @@ export default function Dashboard() {
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">Compliance Dashboard</h1>
         <p className="text-muted-foreground">Monitor your financial compliance and health status</p>
+        {resultsData && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Last updated: {new Date(resultsData.processedAt).toLocaleString()}
+          </p>
+        )}
       </div>
+
+      {/* Financial KPIs Section */}
+      {resultsData?.kpis && (
+        <>
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle>Liquidity Metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">Current Ratio</p>
+                  <p className="text-2xl font-bold">{resultsData.kpis.liquidity.currentRatio.toFixed(2)}</p>
+                  <Badge variant={resultsData.kpis.liquidity.currentRatio >= 1.5 ? "success" : "warning"}>
+                    {resultsData.kpis.liquidity.currentRatio >= 1.5 ? "Good" : "Warning"}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Quick Ratio</p>
+                  <p className="text-2xl font-bold">{resultsData.kpis.liquidity.quickRatio.toFixed(2)}</p>
+                  <Badge variant={resultsData.kpis.liquidity.quickRatio >= 1.0 ? "success" : "warning"}>
+                    {resultsData.kpis.liquidity.quickRatio >= 1.0 ? "Good" : "Warning"}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Cash Ratio</p>
+                  <p className="text-2xl font-bold">{resultsData.kpis.liquidity.cashRatio.toFixed(2)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle>Profitability Metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Gross Margin</p>
+                  <p className="text-2xl font-bold">{(resultsData.kpis.profitability.grossMargin * 100).toFixed(1)}%</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Net Margin</p>
+                  <p className="text-2xl font-bold">{(resultsData.kpis.profitability.netMargin * 100).toFixed(1)}%</p>
+                  <Badge variant={resultsData.kpis.profitability.netMargin >= 0.10 ? "success" : "warning"}>
+                    {resultsData.kpis.profitability.netMargin >= 0.10 ? "Good" : "Warning"}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">ROA</p>
+                  <p className="text-2xl font-bold">{(resultsData.kpis.profitability.roa * 100).toFixed(1)}%</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">ROE</p>
+                  <p className="text-2xl font-bold">{(resultsData.kpis.profitability.roe * 100).toFixed(1)}%</p>
+                  <Badge variant={resultsData.kpis.profitability.roe >= 0.15 ? "success" : "warning"}>
+                    {resultsData.kpis.profitability.roe >= 0.15 ? "Good" : "Warning"}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle>Leverage Metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">Debt-to-Equity</p>
+                  <p className="text-2xl font-bold">{resultsData.kpis.leverage.debtToEquity.toFixed(2)}</p>
+                  <Badge variant={resultsData.kpis.leverage.debtToEquity <= 2.0 ? "success" : "warning"}>
+                    {resultsData.kpis.leverage.debtToEquity <= 2.0 ? "Good" : "Warning"}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Debt-to-Assets</p>
+                  <p className="text-2xl font-bold">{resultsData.kpis.leverage.debtToAssets.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Interest Coverage</p>
+                  <p className="text-2xl font-bold">{resultsData.kpis.leverage.interestCoverage.toFixed(2)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle>Efficiency Metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">Asset Turnover</p>
+                  <p className="text-2xl font-bold">{resultsData.kpis.efficiency.assetTurnover.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Inventory Turnover</p>
+                  <p className="text-2xl font-bold">{resultsData.kpis.efficiency.inventoryTurnover.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Receivables Turnover</p>
+                  <p className="text-2xl font-bold">{resultsData.kpis.efficiency.receivablesTurnover.toFixed(2)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {metrics.map((metric) => {
@@ -120,7 +264,7 @@ export default function Dashboard() {
 
       <Card className="shadow-card">
         <CardHeader>
-          <CardTitle>Recent Compliance Findings</CardTitle>
+          <CardTitle>Compliance Findings</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -134,8 +278,8 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentFindings.map((finding) => (
-                  <tr key={finding.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                {(resultsData?.complianceFindings || recentFindings).map((finding, index) => (
+                  <tr key={index} className="border-b border-border hover:bg-muted/50 transition-colors">
                     <td className="py-3 px-4">
                       <Badge variant="outline">{finding.standard}</Badge>
                     </td>
@@ -143,7 +287,9 @@ export default function Dashboard() {
                     <td className="py-3 px-4">
                       <Badge variant={getSeverityColor(finding.severity)}>{finding.severity}</Badge>
                     </td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground">{finding.status}</td>
+                    <td className="py-3 px-4 text-sm text-muted-foreground">
+                      {typeof finding.status === 'string' ? finding.status.replace('_', ' ') : finding.status}
+                    </td>
                   </tr>
                 ))}
               </tbody>

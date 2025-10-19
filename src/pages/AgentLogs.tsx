@@ -1,25 +1,62 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Search } from "lucide-react";
-
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  agentType: string;
-  logLevel: "INFO" | "WARN" | "ERROR" | "DEBUG";
-  message: string;
-}
+import { getAgentLogs } from "@/services/api";
+import { LogEntry } from "@/types/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AgentLogs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [nextToken, setNextToken] = useState<string | undefined>();
+  const { toast } = useToast();
 
-  // Mock data - will be replaced with CloudWatch integration
+  // Fetch logs from AWS CloudWatch
+  const fetchLogs = async (refresh = false) => {
+    setLoading(true);
+    try {
+      const response = await getAgentLogs({
+        agentType: agentFilter !== "all" ? agentFilter : undefined,
+        logLevel: levelFilter !== "all" ? levelFilter : undefined,
+        filterPattern: searchQuery || undefined,
+        nextToken: refresh ? undefined : nextToken,
+      });
+      
+      setLogs(refresh ? response.events : [...logs, ...response.events]);
+      setNextToken(response.nextToken);
+      
+      if (refresh) {
+        toast({
+          title: "Logs refreshed",
+          description: `Fetched ${response.count} log entries`,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch logs:", error);
+      toast({
+        title: "Failed to fetch logs",
+        description: "Using mock data instead",
+        variant: "destructive",
+      });
+      // Fallback to mock data
+      setLogs(mockLogs);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs(true);
+  }, [agentFilter, levelFilter]);
+
+  // Mock data - fallback when API is not available
   const mockLogs: LogEntry[] = [
     {
       id: "1",
@@ -68,7 +105,9 @@ export default function AgentLogs() {
     }
   };
 
-  const filteredLogs = mockLogs.filter((log) => {
+  const displayedLogs = logs.length > 0 ? logs : mockLogs;
+  
+  const filteredLogs = displayedLogs.filter((log) => {
     const matchesSearch = log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          log.agentType.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesAgent = agentFilter === "all" || log.agentType === agentFilter;
@@ -125,11 +164,26 @@ export default function AgentLogs() {
               </SelectContent>
             </Select>
           </div>
-          <div className="mt-4">
-            <Button variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
+          <div className="mt-4 flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => fetchLogs(true)}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh Logs
             </Button>
+            {nextToken && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => fetchLogs(false)}
+                disabled={loading}
+              >
+                Load More
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
