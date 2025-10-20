@@ -1,73 +1,74 @@
-# Welcome to your Lovable project
+# AI-Powered Financial Compliance Dashboard
 
-## Project info
+## Overview
 
-**URL**: https://lovable.dev/projects/efdb8512-96d8-4c93-ab6b-9199445c4da5
+This project is a **web-based platform** for monitoring financial compliance and health of companies. It integrates **real-time AI agent logs** with a dashboard displaying compliance results, financial health metrics, and detailed findings from multiple agents:  
 
-## How can I edit this code?
+- **Investor Agent** – Analyzes financial indicators and highlights areas of concern.  
+- **Analyst Agent** – Reviews discrepancies and errors in company financials.  
+- **Auditor Agent** – Checks accounting standards compliance and citations.  
 
-There are several ways of editing your application.
+The platform supports both **WebSocket real-time log streaming** and **REST API fallback** for fetching agent results. Users can view detailed results once an analysis run is completed.
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/efdb8512-96d8-4c93-ab6b-9199445c4da5) and start prompting.
+## Features
 
-Changes made via Lovable will be committed automatically to this repo.
+- Real-time logs via WebSocket connection.
+- Automatic detection of completed runs (`[run_id=XYZ]`) and display of a **"Get Results"** button.
+- Display of **compliance findings** and severity levels.
+- Interactive **dashboard metrics** including:
+  - Compliance Status
+  - Total Discrepancies
+  - Critical Issues
+  - Financial Health
+- Visual representation of **financial KPIs** (Liquidity, Profitability, Leverage, Efficiency).
+- Responsive design with **cards, badges, and tables**.
+- Optional fallback to **mock data** when API is unavailable.
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Tech Stack
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Frontend:** React, TypeScript, Vite
+- **UI Components:** Tailwind CSS, ShadCN/UI, Lucide Icons
+- **Real-Time Logs:** WebSocket (`wss://`)
+- **State Management:** React hooks (`useState`, `useEffect`)
+- **API Services:** REST for fetching agent results
+- **Environment Variables:** `.env` with `VITE_` prefix
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Setup
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1. **Clone the repository**
 
-# Step 3: Install the necessary dependencies.
-npm i
+```bash
+git clone <repository-url>
+cd <project-folder>
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+2. **Install dependencies**
+
+```bash
+npm install
+```
+
+3. **Setup environment variables**
+
+Create a .env file at the root:
+```bash
+VITE_API_GATEWAY_URL=https://your-api-url
+VITE_WEBSOCKET_URL=wss://your-websocket-url
+VITE_AGENT_URL=https://your-agent-url
+```
+
+## Note: Only variables prefixed with VITE_ are exposed to the frontend.
+
+## Run the development server
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/efdb8512-96d8-4c93-ab6b-9199445c4da5) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Open http://localhost:5173 in your browser.
