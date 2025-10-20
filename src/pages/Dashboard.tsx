@@ -5,11 +5,31 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { useState, useEffect } from "react";
 import { getDocumentResults } from "@/services/api";
 import { ResultsResponse } from "@/types/api";
+import { useWebSocketLogs } from "@/hooks/useWebSocketLogs";
+import { useAutoFetchResults } from "@/hooks/useAutoFetchResults";
+import { useSearchParams } from "react-router-dom";
 
 export default function Dashboard() {
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [resultsData, setResultsData] = useState<ResultsResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const runId = searchParams.get('run_id');
+
+  // WebSocket logs hook
+  const { logs, isConnected, completedRunIds } = useWebSocketLogs({
+    runId: runId || undefined,
+    autoConnect: !!runId
+  });
+
+  // Auto-fetch results hook
+  const { results } = useAutoFetchResults({
+    completedRunIds,
+    enabled: !!runId
+  });
+
+  // Get current run results
+  const currentResults = runId ? results.get(runId) : null;
 
   // Fetch latest results (placeholder - would need documentKey from storage/context)
   useEffect(() => {
@@ -116,17 +136,155 @@ export default function Dashboard() {
     ]
   };
 
+  const getFinancialHealthColor = (health: string) => {
+    switch (health) {
+      case "GOOD": return "success";
+      case "FAIR": return "warning";
+      case "POOR": return "destructive";
+      default: return "secondary";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">Compliance Dashboard</h1>
         <p className="text-muted-foreground">Monitor your financial compliance and health status</p>
+        {runId && (
+          <div className="flex items-center gap-2 mt-2">
+            <p className="text-sm text-muted-foreground">Run ID: {runId}</p>
+            <Badge variant={isConnected ? "success" : "secondary"}>
+              {isConnected ? "Connected" : "Disconnected"}
+            </Badge>
+          </div>
+        )}
         {resultsData && (
           <p className="text-sm text-muted-foreground mt-1">
             Last updated: {new Date(resultsData.processedAt).toLocaleString()}
           </p>
         )}
       </div>
+
+      {/* Real-time Agent Results */}
+      {currentResults && (
+        <div className="space-y-6">
+          {/* Investor Agent Results */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Investor Agent Results</CardTitle>
+                <Badge variant={getFinancialHealthColor(currentResults.investor_agent_results.financial_health)}>
+                  {currentResults.investor_agent_results.financial_health}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h3 className="font-semibold mb-2">Report</h3>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {currentResults.investor_agent_results.investor_agent_report}
+                </p>
+              </div>
+              
+              {currentResults.investor_agent_results.positive_indicators.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2 text-success">Positive Indicators</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    {currentResults.investor_agent_results.positive_indicators.map((indicator, idx) => (
+                      <li key={idx} className="text-sm text-success">{indicator}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {currentResults.investor_agent_results.areas_of_concerns.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2 text-destructive">Areas of Concern</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    {currentResults.investor_agent_results.areas_of_concerns.map((concern, idx) => (
+                      <li key={idx} className="text-sm text-destructive">{concern}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Analyst Agent Results */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle>Analyst Agent Results</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h3 className="font-semibold mb-2">Report</h3>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {currentResults.analyst_agent_results.analyst_agent_report}
+                </p>
+              </div>
+              
+              {currentResults.analyst_agent_results.errors.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2 text-warning">Errors</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    {currentResults.analyst_agent_results.errors.map((error, idx) => (
+                      <li key={idx} className="text-sm text-warning">{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Auditor Results */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle>Auditor Results</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentResults.auditor_results.errors && (
+                <div>
+                  <h3 className="font-semibold mb-2 text-destructive">Errors</h3>
+                  <p className="text-sm text-destructive whitespace-pre-wrap">
+                    {currentResults.auditor_results.errors}
+                  </p>
+                </div>
+              )}
+              
+              {currentResults.auditor_results.citations && (
+                <div>
+                  <h3 className="font-semibold mb-2">Citations</h3>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {currentResults.auditor_results.citations}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Real-time Logs Terminal */}
+      {runId && logs.length > 0 && (
+        <Card className="shadow-card bg-black">
+          <CardHeader>
+            <CardTitle className="text-green-500">Real-time Processing Logs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="font-mono text-sm space-y-1 max-h-96 overflow-y-auto">
+              {logs.map((log, idx) => (
+                <div key={idx} className="text-green-500">
+                  <span className="text-green-700">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </span>
+                  {" - "}
+                  {log.message}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Financial KPIs Section */}
       {resultsData?.kpis && (

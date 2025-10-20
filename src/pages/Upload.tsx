@@ -5,6 +5,7 @@ import { Upload as UploadIcon, FileText, CheckCircle2, X, AlertCircle } from "lu
 import { useToast } from "@/hooks/use-toast";
 import { uploadDocument, pollDocumentStatus } from "@/services/api";
 import { StatusResponse } from "@/types/api";
+import { useNavigate } from "react-router-dom";
 
 interface UploadedFile {
   id: string;
@@ -20,6 +21,7 @@ interface UploadedFile {
 export default function Upload() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
@@ -45,8 +47,11 @@ export default function Upload() {
 
   const handleUpload = async (fileId: string, file: File) => {
     try {
-      // Upload to AWS API Gateway
-      const uploadResponse = await uploadDocument(file);
+      // Generate unique run_id
+      const runId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Upload to AWS API Gateway with run_id
+      const uploadResponse = await uploadDocument(file, runId);
       
       setFiles((prev) =>
         prev.map((f) =>
@@ -87,8 +92,13 @@ export default function Upload() {
       
       toast({
         title: "Processing completed",
-        description: `${file.name} has been analyzed successfully.`,
+        description: `${file.name} has been analyzed successfully. Redirecting to dashboard...`,
       });
+
+      // Navigate to dashboard with run_id
+      setTimeout(() => {
+        navigate(`/dashboard?run_id=${runId}`);
+      }, 1000);
 
     } catch (error) {
       console.error("Upload error:", error);

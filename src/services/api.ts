@@ -6,7 +6,8 @@ import {
   LogsQueryParams 
 } from "@/types/api";
 
-const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || "http://localhost:3000";
+export const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || "http://localhost:3000";
+export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || "ws://localhost:8080";
 
 // API Error Handler
 class APIError extends Error {
@@ -25,9 +26,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 // 1. POST /api/documents/upload
-export async function uploadDocument(file: File): Promise<UploadResponse> {
+export async function uploadDocument(file: File, runId?: string): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
+  if (runId) {
+    formData.append("run_id", runId);
+  }
   
   const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
     method: "POST",

@@ -94,3 +94,35 @@ export interface LogsQueryParams {
   logLevel?: string;
   nextToken?: string;
 }
+
+// WebSocket Log Entry
+export interface WebSocketLogEntry {
+  timestamp: number;
+  message: string;
+  run_id: string;
+}
+
+// DynamoDB Results
+export interface InvestorAgentResults {
+  investor_agent_report: string;
+  positive_indicators: string[];
+  financial_health: "GOOD" | "FAIR" | "POOR";
+  areas_of_concerns: string[];
+}
+
+export interface AnalystAgentResults {
+  analyst_agent_report: string;
+  errors: string[];
+}
+
+export interface AuditorResults {
+  errors: string;
+  citations: string;
+}
+
+export interface DynamoDBResults {
+  id: string;
+  investor_agent_results: InvestorAgentResults;
+  analyst_agent_results: AnalystAgentResults;
+  auditor_results: AuditorResults;
+}
