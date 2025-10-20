@@ -19,99 +19,12 @@ interface UploadedFile {
   error?: string;
 }
 
-// Add WebSocket message type
-interface WebSocketMessage {
-  timestamp: number;
-  message: string;
-  run_id: string;
-}
 
 export default function Upload() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Initialize WebSocket connection
-  useEffect(() => {
-    const connectWebSocket = () => {
-      const ws = new WebSocket(WEBSOCKET_URL);
-
-      ws.onopen = () => {
-        console.log("WebSocket connected");
-        setWebSocket(ws);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data: WebSocketMessage = JSON.parse(event.data);
-
-          // Update file status based on WebSocket message
-          setFiles(prev => prev.map(file => {
-            if (file.documentKey === data.run_id) {
-              // Update progress based on message content
-              let newProgress = file.progress;
-              let newStage = file.stage;
-
-              if (data.message.includes('Run Completed!')) {
-                return { ...file, status: 'completed', progress: 100 };
-              } else if (data.message.includes('ERROR')) {
-                return {
-                  ...file,
-                  status: 'error',
-                  error: 'Processing failed',
-                  progress: 0
-                };
-              } else if (data.message.includes('Processing document')) {
-                newProgress = 30;
-                newStage = 'Processing document';
-              } else if (data.message.includes('Converting to Markdown')) {
-                newProgress = 50;
-                newStage = 'Converting to Markdown';
-              } else if (data.message.includes('Analyzing financial data')) {
-                newProgress = 70;
-                newStage = 'Analyzing financial data';
-              } else if (data.message.includes('Calculating KPIs')) {
-                newProgress = 90;
-                newStage = 'Calculating KPIs';
-              }
-
-              return {
-                ...file,
-                progress: newProgress,
-                stage: newStage
-              };
-            }
-            return file;
-          }));
-        } catch (err) {
-          console.error('Error parsing WebSocket message:', err);
-        }
-      };
-
-      ws.onclose = () => {
-        console.log("WebSocket disconnected, attempting to reconnect...");
-        // Reconnect after 5 seconds
-        setTimeout(connectWebSocket, 5000);
-      };
-
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-      };
-
-      return () => {
-        ws.close();
-      };
-    };
-
-    connectWebSocket();
-
-    return () => {
-      if (webSocket) {
-        webSocket.close();
-      }
-    };
-  }, []);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
@@ -226,14 +139,6 @@ export default function Upload() {
   const handleGenerateAnalysis = async () => {
     try {
       // Update UI: mark all files as processing
-      setFiles(prev =>
-        prev.map(f => ({
-          ...f,
-          status: "processing",
-          progress: 20,
-          stage: "Starting analysis",
-        }))
-      );
 
       const res = await fetch(`${import.meta.env.VITE_START_AGENT_ANALYSIS}/${runId}`, {
         method: "GET",
@@ -247,55 +152,8 @@ export default function Upload() {
       });
 
       
-      const ws = new WebSocket(WEBSOCKET_URL);
-
-      ws.onopen = () => console.log("WebSocket connected");
-      ws.onclose = () => console.log("WebSocket closed");
-      ws.onerror = (err) => console.error(err);
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          
-          setFiles(prev =>
-            prev.map(f => {
-              if (f.documentKey !== data.run_id) return f;
-
-              let progress = f.progress;
-              let stage = f.stage;
-
-              if (data.message.includes("Run Completed!")) {
-                return { ...f, status: "completed", progress: 100 };
-              } else if (data.message.includes("ERROR")) {
-                return { ...f, status: "error", error: "Processing failed", progress: 0 };
-              } else if (data.message.includes("Processing document")) {
-                progress = 30; stage = "Processing document";
-              } else if (data.message.includes("Converting to Markdown")) {
-                progress = 50; stage = "Converting to Markdown";
-              } else if (data.message.includes("Analyzing financial data")) {
-                progress = 70; stage = "Analyzing financial data";
-              } else if (data.message.includes("Calculating KPIs")) {
-                progress = 90; stage = "Calculating KPIs";
-              }
-
-              return { ...f, progress, stage };
-            })
-          );
-        } catch (err) {
-          console.error("WebSocket message parsing error:", err);
-        }
-      };
     } catch (err) {
       console.error(err);
-      setFiles(prev =>
-        prev.map(f => ({
-          ...f,
-          status: "error",
-          error: err instanceof Error ? err.message : "Analysis failed",
-        }))
-      );
-
       toast({
         title: "Analysis failed",
         description: err instanceof Error ? err.message : "Failed to generate analysis",
