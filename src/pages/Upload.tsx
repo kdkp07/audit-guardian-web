@@ -135,7 +135,7 @@ export default function Upload() {
     }
   };
   // const [runId,setStateVariable] = useState(`${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-  const [runId, setStateVariable] = useState(`HCL`);
+  const [runId, setStateVariable] = useState(`test`);
   const handleUpload = async (fileId: string, file: File) => {
     try {
 
