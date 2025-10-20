@@ -13,11 +13,11 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+
   { title: "Upload Documents", url: "/upload", icon: Upload },
   { title: "Agent Logs", url: "/logs", icon: ScrollText },
   { title: "Compliance Standards", url: "/standards", icon: FileText },
-  { title: "Audit Reports", url: "/reports", icon: AlertCircle },
+  
 ];
 
 export function AppSidebar() {
@@ -29,7 +29,7 @@ export function AppSidebar() {
       <SidebarContent>
         <div className="px-4 py-6">
           <h2 className={`font-bold text-sidebar-foreground ${collapsed ? "text-center text-xs" : "text-xl"}`}>
-            {collapsed ? "FC" : "FinCompliance"}
+            {collapsed ? "FC" : "AuditIQ"}
           </h2>
           {!collapsed && (
             <p className="text-xs text-sidebar-foreground/60 mt-1">AI Compliance Platform</p>

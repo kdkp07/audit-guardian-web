@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload as UploadIcon, FileText, CheckCircle2, X, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { uploadDocument, pollDocumentStatus } from "@/services/api";
-import { StatusResponse } from "@/types/api";
 import { useNavigate } from "react-router-dom";
+import { WEBSOCKET_URL, AGENT_URL } from "@/services/api";
+import { url } from "inspector";
 
+// Types
 interface UploadedFile {
   id: string;
   name: string;
@@ -18,14 +19,103 @@ interface UploadedFile {
   error?: string;
 }
 
+// Add WebSocket message type
+interface WebSocketMessage {
+  timestamp: number;
+  message: string;
+  run_id: string;
+}
+
 export default function Upload() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Initialize WebSocket connection
+  useEffect(() => {
+    const connectWebSocket = () => {
+      const ws = new WebSocket(WEBSOCKET_URL);
+
+      ws.onopen = () => {
+        console.log("WebSocket connected");
+        setWebSocket(ws);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data: WebSocketMessage = JSON.parse(event.data);
+
+          // Update file status based on WebSocket message
+          setFiles(prev => prev.map(file => {
+            if (file.documentKey === data.run_id) {
+              // Update progress based on message content
+              let newProgress = file.progress;
+              let newStage = file.stage;
+
+              if (data.message.includes('Run Completed!')) {
+                return { ...file, status: 'completed', progress: 100 };
+              } else if (data.message.includes('ERROR')) {
+                return {
+                  ...file,
+                  status: 'error',
+                  error: 'Processing failed',
+                  progress: 0
+                };
+              } else if (data.message.includes('Processing document')) {
+                newProgress = 30;
+                newStage = 'Processing document';
+              } else if (data.message.includes('Converting to Markdown')) {
+                newProgress = 50;
+                newStage = 'Converting to Markdown';
+              } else if (data.message.includes('Analyzing financial data')) {
+                newProgress = 70;
+                newStage = 'Analyzing financial data';
+              } else if (data.message.includes('Calculating KPIs')) {
+                newProgress = 90;
+                newStage = 'Calculating KPIs';
+              }
+
+              return {
+                ...file,
+                progress: newProgress,
+                stage: newStage
+              };
+            }
+            return file;
+          }));
+        } catch (err) {
+          console.error('Error parsing WebSocket message:', err);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket disconnected, attempting to reconnect...");
+        // Reconnect after 5 seconds
+        setTimeout(connectWebSocket, 5000);
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
+
+      return () => {
+        ws.close();
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (webSocket) {
+        webSocket.close();
+      }
+    };
+  }, []);
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
-    
+
     const newFiles: UploadedFile[] = selectedFiles.map((file) => ({
       id: Math.random().toString(36).substr(2, 9),
       name: file.name,
@@ -44,84 +134,177 @@ export default function Upload() {
       }
     }
   };
-
+  // const [runId,setStateVariable] = useState(`${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const [runId, setStateVariable] = useState(`HCL`);
   const handleUpload = async (fileId: string, file: File) => {
     try {
-      // Generate unique run_id
-      const runId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      // Upload to AWS API Gateway with run_id
-      const uploadResponse = await uploadDocument(file, runId);
-      
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileId 
-            ? { 
-                ...f, 
-                documentKey: uploadResponse.documentKey, 
-                status: "processing",
-                progress: 25,
-                stage: "uploaded"
-              } 
-            : f
-        )
-      );
 
-      // Poll for status
-      await pollDocumentStatus(
-        uploadResponse.documentKey,
-        (status: StatusResponse) => {
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.documentKey === uploadResponse.documentKey
-                ? {
-                    ...f,
-                    status: status.status === "completed" ? "completed" : status.status === "failed" ? "error" : "processing",
-                    progress: status.progress,
-                    stage: status.stage,
-                    error: status.error || undefined,
-                  }
-                : f
-            )
-          );
-        }
-      );
-
-      // Store documentKey in localStorage for Dashboard access
-      localStorage.setItem("latestDocumentKey", uploadResponse.documentKey);
-      
-      toast({
-        title: "Processing completed",
-        description: `${file.name} has been analyzed successfully. Redirecting to dashboard...`,
-      });
-
-      // Navigate to dashboard with run_id
-      setTimeout(() => {
-        navigate(`/dashboard?run_id=${runId}`);
-      }, 1000);
-
-    } catch (error) {
-      console.error("Upload error:", error);
+      // 1️⃣ Update UI - mark as uploading
       setFiles((prev) =>
         prev.map((f) =>
           f.id === fileId
-            ? { 
-                ...f, 
-                status: "error", 
-                progress: 0,
-                error: error instanceof Error ? error.message : "Upload failed" 
-              }
+            ? {
+              ...f,
+              documentKey: runId,
+              status: "processing",
+              progress: 10,
+              stage: "uploading",
+            }
             : f
         )
       );
+
+
+      const presignRes = await fetch(AGENT_URL,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', },
+          body: JSON.stringify({ id: runId, file_name: file.name, file_type: file.type })
+        });
+
+      if (!presignRes.ok) {
+        throw new Error("Failed to get presigned URL");
+      }
+
+      const { upload_url, file_key } = await presignRes.json();
+
+      const uploadRes = await fetch(upload_url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Failed to upload file to S3");
+      }
+      const response = await fetch(`${import.meta.env.VITE_START_AGENT_ANALYSIS}/${runId}`, 
+        {method: "GET"}
+      );
       
+
+      if (!response.ok) {
+        throw new Error("Failed to start agent processing");
+      }
+
+
+      setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: "processing", progress: 20, stage: "uploaded" } : f));
+
+      localStorage.setItem("latestDocumentKey", runId);
+
+      toast({
+        title: "Processing started",
+        description: `${file.name} uploaded successfully. Analysis started.`,
+      });
+    } catch (error) {
+      console.error("Upload error:", error);
+
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? {
+              ...f,
+              status: "error",
+              progress: 0,
+              error: error instanceof Error ? error.message : "Upload failed",
+            }
+            : f
+        )
+      );
+
       toast({
         title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to upload document",
+        description:
+          error instanceof Error ? error.message : "Failed to upload document",
         variant: "destructive",
       });
     }
   };
+
+  const handleGenerateAnalysis = async () => {
+    try {
+      // Update UI: mark all files as processing
+      setFiles(prev =>
+        prev.map(f => ({
+          ...f,
+          status: "processing",
+          progress: 20,
+          stage: "Starting analysis",
+        }))
+      );
+
+      const res = await fetch(`${import.meta.env.VITE_START_AGENT_ANALYSIS}/${runId}`, {
+        method: "GET",
+      });
+
+      if (!res.ok) throw new Error("Failed to start analysis");
+
+      toast({
+        title: "Processing started",
+        description: `All uploaded files are being analyzed.`,
+      });
+
+      
+      const ws = new WebSocket(WEBSOCKET_URL);
+
+      ws.onopen = () => console.log("WebSocket connected");
+      ws.onclose = () => console.log("WebSocket closed");
+      ws.onerror = (err) => console.error(err);
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          
+          setFiles(prev =>
+            prev.map(f => {
+              if (f.documentKey !== data.run_id) return f;
+
+              let progress = f.progress;
+              let stage = f.stage;
+
+              if (data.message.includes("Run Completed!")) {
+                return { ...f, status: "completed", progress: 100 };
+              } else if (data.message.includes("ERROR")) {
+                return { ...f, status: "error", error: "Processing failed", progress: 0 };
+              } else if (data.message.includes("Processing document")) {
+                progress = 30; stage = "Processing document";
+              } else if (data.message.includes("Converting to Markdown")) {
+                progress = 50; stage = "Converting to Markdown";
+              } else if (data.message.includes("Analyzing financial data")) {
+                progress = 70; stage = "Analyzing financial data";
+              } else if (data.message.includes("Calculating KPIs")) {
+                progress = 90; stage = "Calculating KPIs";
+              }
+
+              return { ...f, progress, stage };
+            })
+          );
+        } catch (err) {
+          console.error("WebSocket message parsing error:", err);
+        }
+      };
+    } catch (err) {
+      console.error(err);
+      setFiles(prev =>
+        prev.map(f => ({
+          ...f,
+          status: "error",
+          error: err instanceof Error ? err.message : "Analysis failed",
+        }))
+      );
+
+      toast({
+        title: "Analysis failed",
+        description: err instanceof Error ? err.message : "Failed to generate analysis",
+        variant: "destructive",
+      });
+    }
+  };
+
+
 
   const removeFile = (fileId: string) => {
     setFiles(files.filter((f) => f.id !== fileId));
@@ -177,11 +360,15 @@ export default function Upload() {
           <CardContent>
             <div className="space-y-4">
               {files.map((file) => (
-                <div key={file.id} className="flex items-center gap-4 p-4 border border-border rounded-lg">
+                <div
+                  key={file.id}
+                  className="flex items-center gap-4 p-4 border border-border rounded-lg"
+                >
                   <FileText className="h-8 w-8 text-primary flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">{file.name}</p>
                     <p className="text-sm text-muted-foreground">{formatFileSize(file.size)}</p>
+
                     {(file.status === "uploading" || file.status === "processing") && (
                       <div className="mt-2">
                         <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -195,16 +382,20 @@ export default function Upload() {
                         </p>
                       </div>
                     )}
+
+
                     {file.status === "error" && file.error && (
                       <p className="text-xs text-destructive mt-1">{file.error}</p>
                     )}
                   </div>
+
                   {file.status === "completed" && (
                     <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
                   )}
                   {file.status === "error" && (
                     <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
                   )}
+
                   <Button
                     variant="ghost"
                     size="icon"
@@ -217,8 +408,16 @@ export default function Upload() {
               ))}
             </div>
           </CardContent>
+          <Button
+            size="sm"
+            className="mt-2"
+            onClick={() => handleGenerateAnalysis()}
+          >
+            Generate Analysis
+          </Button>
         </Card>
       )}
+
     </div>
   );
 }
