@@ -93,14 +93,7 @@ export default function Upload() {
       if (!uploadRes.ok) {
         throw new Error("Failed to upload file to S3");
       }
-      const response = await fetch(`${import.meta.env.VITE_START_AGENT_ANALYSIS}/${runId}`, 
-        {method: "GET"}
-      );
       
-
-      if (!response.ok) {
-        throw new Error("Failed to start agent processing");
-      }
 
 
       setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: "processing", progress: 20, stage: "uploaded" } : f));
