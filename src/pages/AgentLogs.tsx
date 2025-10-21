@@ -5,12 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { WEBSOCKET_URL } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAgentLogs } from "../context/AgentLogsContext";
+import LogItem from "@/components/LogItem";
 
 export default function AgentLogs() {
   const [logs, setLogs] = useState<string[]>([]);
-  const [detectedRunId, setDetectedRunId] = useState<string | null>(null);
+  const [detectedRunId, setDetectedRunId] = useState<string | null>(localStorage.getItem("latestDocumentKey"));
+  const [isComplete, setIsComplete] = useState<boolean>(false)
   const [result, setResult] = useState<any>(null);
   const { toast } = useToast();
+  const { setLogsData, logsData } = useAgentLogs<Object>();
+  console.log("LOGS DATA", logsData)
 
   useEffect(() => {
     const ws = new WebSocket(WEBSOCKET_URL);
@@ -21,14 +26,24 @@ export default function AgentLogs() {
 
     ws.onmessage = (event) => {
       try {
-        const message = typeof event.data === "string" ? event.data : JSON.stringify(event.data);
-        setLogs((prev) => [...prev, message]);
-
+        let message = typeof event.data === "string" ? event.data : JSON.stringify(event.data);
+        console.log(message)
+        console.log(detectedRunId)
+        if (message.includes(`agent called for ${detectedRunId}`) && message.length < 500){
+          if (message.includes(`Investor`)){
+            message = "✅ Investor Agent Execution Complete"
+          }else if (message.includes(`Analyst`)){
+            message = "✅ Analyst Agent Execution Complete"
+          }else if (message.includes(`Auditor`)){
+            message = "✅ Auditor Agent Execution Complete"
+          }
+          setLogs((prev) => [...prev, message]);
+        }
         const match = message.match(/\[run_id=(.*?)\]/i);
         if (match && message.includes("Run Completed!")) {
           const runId = match[1];
           console.log("Detected completed run_id:", runId);
-          setDetectedRunId(runId);
+          setIsComplete(true);
           toast({
             title: "Analysis Completed",
             description: `Run ID ${runId} finished successfully.`,
@@ -43,6 +58,8 @@ export default function AgentLogs() {
   }, [toast]);
 
   const handleGetResults = async () => {
+
+
     if (!detectedRunId) return;
     try {
       const res = await fetch(
@@ -53,6 +70,8 @@ export default function AgentLogs() {
       const data = await res.json();
 
       setResult(data);
+      setLogsData(data);
+
       toast({ title: "Results fetched successfully" });
     } catch (err) {
       console.error("Error fetching results:", err);
@@ -167,32 +186,19 @@ export default function AgentLogs() {
           <CardTitle>Live Logs</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[400px] overflow-y-auto bg-muted p-4 rounded-md font-mono text-sm">
+          <div className="h-[400px] overflow-y-auto p-4 rounded-md font-mono text-sm">
             {logs.length === 0 ? (
               <p className="text-muted-foreground italic">Waiting for logs...</p>
             ) : (
               logs.map((log, i) => (
                 <div key={i} className="mb-1">
-                  {log.includes("ERROR") ? (
-                    <Badge variant="destructive" className="mr-2">
-                      ERROR
-                    </Badge>
-                  ) : log.includes("WARN") ? (
-                    <Badge variant="warning" className="mr-2">
-                      WARN
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="mr-2">
-                      INFO
-                    </Badge>
-                  )}
-                  {log}
+                  <LogItem key={i} log={log}/>
                 </div>
               ))
             )}
           </div>
 
-          {detectedRunId && (
+          {isComplete && (
             <div className="mt-4 flex justify-end">
               <Button onClick={handleGetResults}>Get Results for {detectedRunId}</Button>
             </div>

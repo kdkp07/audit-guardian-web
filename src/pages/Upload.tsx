@@ -48,7 +48,7 @@ export default function Upload() {
     }
   };
   // const [runId,setStateVariable] = useState(`${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-  const [runId, setStateVariable] = useState(`${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+  const [runId, setStateVariable] = useState('test');
   const handleUpload = async (fileId: string, file: File) => {
     try {
 
@@ -81,6 +81,7 @@ export default function Upload() {
       }
 
       const { upload_url, file_key } = await presignRes.json();
+      setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: "processing", progress: 20, stage: "uploading" } : f));
 
       const uploadRes = await fetch(upload_url, {
         method: "PUT",
@@ -94,9 +95,10 @@ export default function Upload() {
         throw new Error("Failed to upload file to S3");
       }
       
+      setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: "completed", progress: 100, stage: "uploading" } : f));
 
 
-      setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: "processing", progress: 20, stage: "uploaded" } : f));
+      
 
       localStorage.setItem("latestDocumentKey", runId);
 

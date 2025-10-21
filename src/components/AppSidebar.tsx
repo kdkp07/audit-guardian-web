@@ -13,10 +13,9 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-
+  { title: "Dashboard", url: "/", icon: AlertCircle},
   { title: "Upload Documents", url: "/upload", icon: Upload },
   { title: "Agent Logs", url: "/logs", icon: ScrollText },
-  { title: "Compliance Standards", url: "/standards", icon: FileText },
   
 ];
 

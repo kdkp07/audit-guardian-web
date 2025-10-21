@@ -10,6 +10,7 @@ import AgentLogs from "./pages/AgentLogs";
 import ComplianceStandards from "./pages/ComplianceStandards";
 import AuditReports from "./pages/AuditReports";
 import NotFound from "./pages/NotFound";
+import { AgentLogsProvider } from "./context/AgentLogsContext.js";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +19,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <AgentLogsProvider> 
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout><Dashboard /></Layout>} />
@@ -29,6 +31,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      </AgentLogsProvider> 
     </TooltipProvider>
   </QueryClientProvider>
 );
