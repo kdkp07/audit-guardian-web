@@ -57,7 +57,7 @@ export default function Dashboard() {
       icon: XCircle
     },
     {
-      title: "Total Discrepancies",
+      title: "Errors Found",
       value: analyst_agent_results.errors.length.toString(),
       status: analyst_agent_results.errors.length > 0 ? "warning" : "success",
       icon: AlertTriangle
@@ -87,7 +87,7 @@ export default function Dashboard() {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-4">
         {metrics.map((metric) => {
           const Icon = metric.icon;
           return (
@@ -97,11 +97,11 @@ export default function Dashboard() {
               onClick={() => setSelectedMetric(metric.title)}
             >
               <CardHeader className="flex justify-between items-center pb-2">
-                <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
+                <CardTitle className="text-2xl">{metric.title}</CardTitle>
                 <Icon className={`h-4 w-4 text-${getStatusColor(metric.status)}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-center">{metric.value}</div>
+                <div className="text-lg font-bold text-center">{metric.value}</div>
               </CardContent>
             </Card>
           );
